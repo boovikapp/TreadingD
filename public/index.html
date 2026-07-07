@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>המרת דוח IBKR לדוח מס ישראלי</title>
+<title>המרת דוח Pepperstone (cTrader) לדוח מס ישראלי</title>
 <style>
   * { box-sizing: border-box; }
   body {
@@ -59,8 +59,8 @@
 </head>
 <body>
   <div class="card">
-    <h1>המרת דוח פעילות IBKR לדוח מס (₪)</h1>
-    <p class="sub">העלה קובץ Activity Statement CSV שנתי מ-Interactive Brokers, וקבל קובץ אקסל מתורגם לשקלים לפי שער יציג של בנק ישראל.</p>
+    <h1>המרת דוח Pepperstone (cTrader) לדוח מס (₪)</h1>
+    <p class="sub">העלה קובץ Statement CSV מ-cTrader (Pepperstone), וקבל קובץ אקסל עם רווח/הפסד לכל עסקה סגורה, מתורגם לשקלים לפי שער יציג של בנק ישראל.</p>
 
     <div id="dropzone">
       גרור לכאן קובץ CSV, או לחץ לבחירה
@@ -138,7 +138,7 @@
       const blob = await response.blob();
       const disposition = response.headers.get('Content-Disposition') || '';
       const match = disposition.match(/filename="?([^"]+)"?/);
-      const filename = match ? match[1] : 'IBKR_Tax_Report.xlsx';
+      const filename = match ? match[1] : 'Pepperstone_Tax_Report.xlsx';
 
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');

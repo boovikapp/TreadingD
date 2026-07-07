@@ -3,7 +3,7 @@
 // POST { csvContent: string, taxYear?: string }
 // -> returns an .xlsx file (binary) ready for download.
 
-const { parseIbkrSections, extractClosingTrades } = require('../lib/csvParser');
+const { extractClosedDeals } = require('../lib/csvParser');
 const { calculateIlsReport } = require('../lib/taxCalculator');
 const { buildWorkbook } = require('../lib/excelBuilder');
 
@@ -41,30 +41,21 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    // 1. Parse the multi-section IBKR CSV
-    const sections = parseIbkrSections(csvContent);
-    if (!sections['Trades']) {
+    // 1. Parse the cTrader statement (Deals / Transactions / Summary blocks)
+    const { deals, reportedTotalNetUsd } = extractClosedDeals(csvContent);
+    if (deals.length === 0) {
       res.status(400).json({
-        error: 'לא נמצאה סקציית "Trades" בקובץ. ודא שזה קובץ Activity Statement CSV תקין מ-IBKR.',
+        error: 'לא נמצאו עסקאות סגורות בסקציית "Deals". ודא שזה קובץ Statement CSV תקין מ-cTrader (Pepperstone).',
       });
       return;
     }
 
-    // 2. Extract only closed positions (realized trades)
-    const closingTrades = extractClosingTrades(sections);
-    if (closingTrades.length === 0) {
-      res.status(400).json({
-        error: 'לא נמצאו עסקאות סגורות (עם רווח/הפסד ממומש) בקובץ שהועלה.',
-      });
-      return;
-    }
+    // 2. Convert to ILS using BOI representative rates (with fallback + caching)
+    const { rows, totals } = await calculateIlsReport(deals);
 
-    // 3. Convert to ILS using BOI representative rates (with fallback + caching)
-    const { rows, totals } = await calculateIlsReport(closingTrades);
-
-    // 4. Build the two-tab Excel file
-    const resolvedYear = taxYear || (rows[0]?.sellDate || '').slice(0, 4) || 'unknown';
-    const workbookBuffer = buildWorkbook(rows, totals, resolvedYear);
+    // 3. Build the two-tab Excel file
+    const resolvedYear = taxYear || (rows[0]?.closeDate || '').slice(0, 4) || 'unknown';
+    const workbookBuffer = buildWorkbook(rows, totals, resolvedYear, reportedTotalNetUsd);
 
     res.setHeader(
       'Content-Type',
@@ -72,7 +63,7 @@ module.exports = async function handler(req, res) {
     );
     res.setHeader(
       'Content-Disposition',
-      `attachment; filename="IBKR_Tax_Report_${resolvedYear}.xlsx"`
+      `attachment; filename="Pepperstone_Tax_Report_${resolvedYear}.xlsx"`
     );
     res.status(200).send(workbookBuffer);
   } catch (err) {
