@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>המרת דוח IBKR לדוח מס ישראלי</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Segoe UI", Arial, sans-serif;
+    background: #f5f6f8;
+    margin: 0;
+    padding: 40px 16px;
+    display: flex;
+    justify-content: center;
+  }
+  .card {
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.08);
+    padding: 32px;
+    max-width: 520px;
+    width: 100%;
+  }
+  h1 { font-size: 20px; margin: 0 0 8px; }
+  p.sub { color: #666; margin: 0 0 24px; font-size: 14px; }
+  #dropzone {
+    border: 2px dashed #bbb;
+    border-radius: 12px;
+    padding: 40px 16px;
+    text-align: center;
+    color: #888;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  #dropzone.dragover {
+    border-color: #2563eb;
+    background: #eff6ff;
+    color: #2563eb;
+  }
+  #fileInput { display: none; }
+  #fileName { margin-top: 12px; font-size: 14px; color: #333; }
+  button {
+    width: 100%;
+    margin-top: 20px;
+    padding: 12px;
+    border: none;
+    border-radius: 10px;
+    background: #2563eb;
+    color: #fff;
+    font-size: 16px;
+    cursor: pointer;
+  }
+  button:disabled { background: #a9c2f5; cursor: not-allowed; }
+  #status { margin-top: 16px; font-size: 14px; }
+  #status.error { color: #dc2626; }
+  #status.ok { color: #16a34a; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>המרת דוח פעילות IBKR לדוח מס (₪)</h1>
+    <p class="sub">העלה קובץ Activity Statement CSV שנתי מ-Interactive Brokers, וקבל קובץ אקסל מתורגם לשקלים לפי שער יציג של בנק ישראל.</p>
+
+    <div id="dropzone">
+      גרור לכאן קובץ CSV, או לחץ לבחירה
+      <input type="file" id="fileInput" accept=".csv" />
+    </div>
+    <div id="fileName"></div>
+
+    <button id="submitBtn" disabled>עבד את הקובץ והורד אקסל</button>
+    <div id="status"></div>
+  </div>
+
+<script>
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  const fileNameEl = document.getElementById('fileName');
+  const submitBtn = document.getElementById('submitBtn');
+  const statusEl = document.getElementById('status');
+
+  let selectedFile = null;
+
+  dropzone.addEventListener('click', () => fileInput.click());
+
+  dropzone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropzone.classList.add('dragover');
+  });
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+  dropzone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropzone.classList.remove('dragover');
+    if (e.dataTransfer.files.length > 0) {
+      setFile(e.dataTransfer.files[0]);
+    }
+  });
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files.length > 0) setFile(fileInput.files[0]);
+  });
+
+  function setFile(file) {
+    selectedFile = file;
+    fileNameEl.textContent = `נבחר: ${file.name}`;
+    submitBtn.disabled = false;
+    statusEl.textContent = '';
+    statusEl.className = '';
+  }
+
+  submitBtn.addEventListener('click', async () => {
+    if (!selectedFile) return;
+
+    submitBtn.disabled = true;
+    statusEl.className = '';
+    statusEl.textContent = 'קורא קובץ...';
+
+    try {
+      const csvContent = await selectedFile.text();
+
+      statusEl.textContent = 'מעבד ומושך שערי חליפין מבנק ישראל... זה עשוי לקחת מספר שניות.';
+
+      const response = await fetch('/api/process-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ csvContent }),
+      });
+
+      if (!response.ok) {
+        let message = 'שגיאה בעיבוד הקובץ.';
+        try {
+          const errJson = await response.json();
+          if (errJson.error) message = errJson.error;
+        } catch (_) {}
+        throw new Error(message);
+      }
+
+      const blob = await response.blob();
+      const disposition = response.headers.get('Content-Disposition') || '';
+      const match = disposition.match(/filename="?([^"]+)"?/);
+      const filename = match ? match[1] : 'IBKR_Tax_Report.xlsx';
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+
+      statusEl.className = 'ok';
+      statusEl.textContent = 'הקובץ הורד בהצלחה ✔';
+    } catch (err) {
+      statusEl.className = 'error';
+      statusEl.textContent = err.message || 'שגיאה לא צפויה.';
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>

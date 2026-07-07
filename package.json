@@ -1,0 +1,13 @@
+{
+  "name": "ibkr-tax-il",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Vercel app: IBKR annual activity CSV -> Israeli tax-ready Excel report (ILS, BOI representative rates)",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "csv-parse": "^5.5.6",
+    "xlsx": "^0.18.5"
+  }
+}
